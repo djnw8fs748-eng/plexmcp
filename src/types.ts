@@ -156,6 +156,32 @@ export interface PlexHistoryItem {
   deviceID: number;
 }
 
+export interface PlexFriend {
+  id: string;
+  username: string;
+  email?: string;
+  thumb?: string;
+  status: string;
+  sharedServers?: PlexSharedServer[];
+  sharedSections?: string[];
+  allowSync?: boolean;
+  allowCameraUpload?: boolean;
+  allowChannels?: boolean;
+  filterMovies?: string;
+  filterTelevision?: string;
+  filterMusic?: string;
+}
+
+export interface PlexSharedServer {
+  id: string;
+  name: string;
+  machineIdentifier: string;
+  owned: boolean;
+  serverId: string;
+  lastSeenAt?: string;
+  numLibraries?: number;
+}
+
 // Tool Response Types
 
 export interface ToolResponse {

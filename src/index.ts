@@ -14,6 +14,10 @@ import { clientTools } from './tools/clients.js';
 import { playlistTools } from './tools/playlists.js';
 import { posterTools } from './tools/posters.js';
 import { systemTools } from './tools/system.js';
+import { libraryManagementTools } from './tools/library-management.js';
+import { sharingTools } from './tools/sharing.js';
+import { smartSearchTools } from './tools/smart-search.js';
+import { tautulliTools } from './tools/tautulli.js';
 import { createErrorResponse } from './utils.js';
 import type { ToolResponse } from './types.js';
 
@@ -25,6 +29,10 @@ const allTools = [
   ...playlistTools,
   ...posterTools,
   ...systemTools,
+  ...libraryManagementTools,
+  ...sharingTools,
+  ...smartSearchTools,
+  ...tautulliTools,
 ];
 
 // Create tool handler map

@@ -9,11 +9,15 @@ A TypeScript-based MCP (Model Context Protocol) server that provides full contro
 | Category | Tools | Description |
 |----------|-------|-------------|
 | **Library** | `search_library`, `get_library_sections`, `get_recently_added`, `get_on_deck` | Browse and search media |
+| **Smart Search** | `smart_search`, `advanced_search` | Natural language and filtered search |
+| **Library Management** | `scan_library`, `refresh_metadata`, `analyze_media`, `empty_trash`, `clean_bundles`, `optimize_database` | Library maintenance |
 | **Playback** | `play_media`, `pause`, `resume`, `stop`, `seek`, `set_volume`, `get_playback_status` | Control active sessions |
 | **Clients** | `list_clients`, `get_active_sessions` | View connected devices |
 | **History** | `get_watch_history`, `get_continue_watching` | View watch progress |
 | **Playlists** | `list_playlists`, `get_playlist_items`, `create_playlist`, `add_to_playlist`, `remove_from_playlist`, `delete_playlist` | Manage playlists |
 | **Posters** | `list_posters`, `get_current_poster`, `set_poster`, `delete_poster`, `upload_poster` | Manage media artwork |
+| **Sharing** | `list_friends`, `get_friend`, `share_library`, `update_share`, `unshare_library`, `invite_friend` | Manage library sharing |
+| **Tautulli** | `tautulli_activity`, `tautulli_history`, `tautulli_most_watched`, `tautulli_user_stats`, etc. | Advanced statistics |
 | **System** | `get_server_info`, `set_read_only_mode`, `get_mode` | Server status and mode control |
 
 ### Read-Only Mode
@@ -69,6 +73,8 @@ When enabled via `set_read_only_mode(true)`:
 | `PLEX_URL` | URL of your Plex server | `http://localhost:32400` |
 | `PLEX_TOKEN` | Your Plex authentication token | (required) |
 | `READ_ONLY_MODE` | Start in read-only mode | `false` |
+| `TAUTULLI_URL` | URL of your Tautulli server (optional) | - |
+| `TAUTULLI_API_KEY` | Tautulli API key (optional) | - |
 
 ### Claude Desktop
 
@@ -139,6 +145,33 @@ Once configured, you can interact naturally with Claude:
 - "Upload a new poster for Breaking Bad from this URL"
 - "Delete the old posters for a movie"
 
+### Smart Search (Natural Language)
+- "Find unwatched sci-fi movies from the 90s"
+- "Show me comedy shows rated above 8"
+- "What 4k movies haven't I watched?"
+- "Find action movies added in the last week"
+- "Show me short films under 90 minutes"
+
+### Library Management
+- "Scan my Movies library for new content"
+- "Refresh metadata for Inception"
+- "Analyze The Matrix for intro detection"
+- "Optimize the Plex database"
+- "Empty the trash"
+
+### Library Sharing
+- "Who am I sharing my library with?"
+- "Share my Movies library with john@example.com"
+- "Remove sharing access for a friend"
+- "What sections is my friend allowed to see?"
+
+### Tautulli Statistics
+- "What's currently streaming on Plex?"
+- "Show me the most watched movies this month"
+- "Who are my most active users?"
+- "What's my transcode vs direct play ratio?"
+- "Show play statistics for the last 30 days"
+
 ### System
 - "Get Plex server info"
 - "Enable read-only mode"
@@ -205,6 +238,49 @@ Once configured, you can interact naturally with Claude:
 | `get_watch_history` | Get watch history | Yes |
 | `get_continue_watching` | Get in-progress items | Yes |
 
+### Smart Search Tools
+
+| Tool | Description | Read-Only Safe |
+|------|-------------|----------------|
+| `smart_search` | Natural language search (e.g., "unwatched 90s sci-fi") | Yes |
+| `advanced_search` | Search with precise filters (year, rating, genre, etc.) | Yes |
+
+### Library Management Tools
+
+| Tool | Description | Read-Only Safe |
+|------|-------------|----------------|
+| `scan_library` | Trigger a library scan for new content | No |
+| `refresh_metadata` | Refresh metadata for a specific item | No |
+| `analyze_media` | Analyze media for intros/chapters | No |
+| `empty_trash` | Empty trash for a section or all | No |
+| `clean_bundles` | Clean up old metadata bundles | No |
+| `optimize_database` | Optimize the Plex database | No |
+
+### Sharing Tools
+
+| Tool | Description | Read-Only Safe |
+|------|-------------|----------------|
+| `list_friends` | List all Plex friends | Yes |
+| `get_friend` | Get details about a friend | Yes |
+| `get_shared_servers` | Get shared server configurations | Yes |
+| `share_library` | Share library sections with a friend | No |
+| `update_share` | Update sharing settings | No |
+| `unshare_library` | Remove sharing access | No |
+| `invite_friend` | Invite someone by email | No |
+
+### Tautulli Tools (requires Tautulli)
+
+| Tool | Description | Read-Only Safe |
+|------|-------------|----------------|
+| `tautulli_activity` | Real-time streaming activity | Yes |
+| `tautulli_history` | Detailed watch history | Yes |
+| `tautulli_library_stats` | Library statistics | Yes |
+| `tautulli_user_stats` | User statistics | Yes |
+| `tautulli_most_watched` | Most watched movies/shows | Yes |
+| `tautulli_most_active_users` | Most active users ranking | Yes |
+| `tautulli_plays_by_date` | Play counts over time | Yes |
+| `tautulli_stream_type_stats` | Direct play vs transcode stats | Yes |
+
 ## Development
 
 ```bash
@@ -236,6 +312,15 @@ npm start
 ### Read-only mode errors
 - Use `get_mode` to check current mode
 - Use `set_read_only_mode(false)` to disable read-only mode
+
+### Tautulli not working
+- Verify `TAUTULLI_URL` and `TAUTULLI_API_KEY` are set correctly
+- Check that Tautulli is running and accessible
+- Find your API key in Tautulli Settings > Web Interface > API Key
+
+### Sharing tools not working
+- Sharing features require your Plex token to have access to plex.tv APIs
+- Ensure your Plex account is properly linked
 
 ## License
 

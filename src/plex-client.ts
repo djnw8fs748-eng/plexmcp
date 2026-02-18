@@ -8,6 +8,8 @@ import type {
   PlexPlaylist,
   PlexPoster,
   PlexHistoryItem,
+  PlexFriend,
+  PlexSharedServer,
 } from './types.js';
 
 export class PlexApiClient {
@@ -403,6 +405,355 @@ export class PlexApiClient {
     } catch (error) {
       this.handleError(error);
     }
+  }
+
+  // Library Management
+  async scanLibrary(sectionId: string): Promise<void> {
+    try {
+      await this.client.get(`/library/sections/${sectionId}/refresh`);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async refreshMetadata(ratingKey: string, force: boolean = false): Promise<void> {
+    try {
+      await this.client.put(`/library/metadata/${ratingKey}/refresh`, null, {
+        params: force ? { force: 1 } : {},
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async analyzeMedia(ratingKey: string): Promise<void> {
+    try {
+      await this.client.put(`/library/metadata/${ratingKey}/analyze`);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async emptyTrash(sectionId?: string): Promise<void> {
+    try {
+      if (sectionId) {
+        await this.client.put(`/library/sections/${sectionId}/emptyTrash`);
+      } else {
+        // Empty trash for all sections
+        const sections = await this.getLibrarySections();
+        for (const section of sections) {
+          await this.client.put(`/library/sections/${section.key}/emptyTrash`);
+        }
+      }
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async cleanBundles(): Promise<void> {
+    try {
+      await this.client.put('/library/clean/bundles');
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async optimizeDatabase(): Promise<void> {
+    try {
+      await this.client.put('/library/optimize');
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // Friends and Sharing (requires Plex.tv API)
+  private async plexTvRequest(
+    method: 'get' | 'post' | 'put' | 'delete',
+    endpoint: string,
+    params?: Record<string, unknown>
+  ): Promise<unknown> {
+    const plexToken = process.env.PLEX_TOKEN;
+    const response = await axios({
+      method,
+      url: `https://plex.tv/api/v2${endpoint}`,
+      headers: {
+        'X-Plex-Token': plexToken,
+        'X-Plex-Client-Identifier': 'plex-mcp-server',
+        Accept: 'application/json',
+      },
+      params,
+    });
+    return response.data;
+  }
+
+  async getFriends(): Promise<PlexFriend[]> {
+    try {
+      const data = await this.plexTvRequest('get', '/friends') as PlexFriend[];
+      return data || [];
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getFriend(friendId: string): Promise<PlexFriend> {
+    try {
+      const data = await this.plexTvRequest('get', `/friends/${friendId}`) as PlexFriend;
+      return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getSharedServers(): Promise<PlexSharedServer[]> {
+    try {
+      const data = await this.plexTvRequest('get', '/resources', {
+        includeSharedServers: 1,
+      }) as PlexSharedServer[];
+      return data || [];
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async shareLibrary(
+    friendId: string,
+    sectionIds: string[],
+    options: {
+      allowSync?: boolean;
+      allowCameraUpload?: boolean;
+      allowChannels?: boolean;
+      filterMovies?: string;
+      filterTelevision?: string;
+      filterMusic?: string;
+    } = {}
+  ): Promise<void> {
+    try {
+      const machineId = await this.getMachineIdentifier();
+      await this.plexTvRequest('post', `/servers/${machineId}/shared_servers`, {
+        invitedId: friendId,
+        librarySectionIds: sectionIds.join(','),
+        ...options,
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async updateShare(
+    friendId: string,
+    options: {
+      sectionIds?: string[];
+      allowSync?: boolean;
+      allowCameraUpload?: boolean;
+      allowChannels?: boolean;
+    }
+  ): Promise<void> {
+    try {
+      const machineId = await this.getMachineIdentifier();
+      const params: Record<string, unknown> = {};
+      if (options.sectionIds) params.librarySectionIds = options.sectionIds.join(',');
+      if (options.allowSync !== undefined) params.allowSync = options.allowSync;
+      if (options.allowCameraUpload !== undefined) params.allowCameraUpload = options.allowCameraUpload;
+      if (options.allowChannels !== undefined) params.allowChannels = options.allowChannels;
+
+      await this.plexTvRequest('put', `/servers/${machineId}/shared_servers/${friendId}`, params);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async unshareLibrary(friendId: string): Promise<void> {
+    try {
+      const machineId = await this.getMachineIdentifier();
+      await this.plexTvRequest('delete', `/servers/${machineId}/shared_servers/${friendId}`);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async inviteFriend(email: string, sectionIds: string[]): Promise<void> {
+    try {
+      const machineId = await this.getMachineIdentifier();
+      await this.plexTvRequest('post', `/servers/${machineId}/shared_servers`, {
+        invitedEmail: email,
+        librarySectionIds: sectionIds.join(','),
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // Advanced Search
+  async advancedSearch(filters: Record<string, unknown>): Promise<PlexMediaItem[]> {
+    try {
+      // Determine the section to search
+      let sectionId = filters.sectionId as string | undefined;
+
+      if (!sectionId) {
+        // Find the appropriate section based on type
+        const sections = await this.getLibrarySections();
+        const type = filters.type as string;
+
+        if (type === 'movie') {
+          const movieSection = sections.find((s) => s.type === 'movie');
+          sectionId = movieSection?.key;
+        } else if (type === 'show' || type === 'episode') {
+          const showSection = sections.find((s) => s.type === 'show');
+          sectionId = showSection?.key;
+        } else if (type === 'artist' || type === 'album' || type === 'track') {
+          const musicSection = sections.find((s) => s.type === 'artist');
+          sectionId = musicSection?.key;
+        }
+      }
+
+      if (!sectionId) {
+        throw new Error('Could not determine library section for search');
+      }
+
+      // Build Plex filter parameters
+      const params: Record<string, string | number> = {
+        type: this.getPlexTypeNumber(filters.type as string),
+      };
+
+      // Title filter
+      if (filters.title) {
+        params['title'] = filters.title as string;
+      }
+
+      // Year filters
+      if (filters.year) {
+        params['year'] = filters.year as number;
+      }
+      if (filters.minYear || filters.maxYear) {
+        const min = (filters.minYear as number) || 1800;
+        const max = (filters.maxYear as number) || new Date().getFullYear();
+        params['year>>'] = min;
+        params['year<<'] = max;
+      }
+      if (filters.decade) {
+        const decade = filters.decade as number;
+        params['year>>'] = decade;
+        params['year<<'] = decade + 9;
+      }
+
+      // Rating filters
+      if (filters.minRating) {
+        params['rating>>'] = filters.minRating as number;
+      }
+      if (filters.maxRating) {
+        params['rating<<'] = filters.maxRating as number;
+      }
+
+      // Genre filter
+      if (filters.genre) {
+        params['genre'] = filters.genre as string;
+      }
+
+      // Content rating
+      if (filters.contentRating) {
+        params['contentRating'] = filters.contentRating as string;
+      }
+
+      // Director filter
+      if (filters.director) {
+        params['director'] = filters.director as string;
+      }
+
+      // Actor filter
+      if (filters.actor) {
+        params['actor'] = filters.actor as string;
+      }
+
+      // Studio filter
+      if (filters.studio) {
+        params['studio'] = filters.studio as string;
+      }
+
+      // Watch status filters
+      if (filters.unwatched) {
+        params['unwatched'] = 1;
+      }
+      if (filters.inProgress) {
+        params['inProgress'] = 1;
+      }
+
+      // Duration filters (convert minutes to milliseconds)
+      if (filters.minDuration) {
+        params['duration>>'] = (filters.minDuration as number) * 60 * 1000;
+      }
+      if (filters.maxDuration) {
+        params['duration<<'] = (filters.maxDuration as number) * 60 * 1000;
+      }
+
+      // Recently added filter
+      if (filters.addedWithin) {
+        const daysAgo = filters.addedWithin as number;
+        const timestamp = Math.floor((Date.now() - daysAgo * 24 * 60 * 60 * 1000) / 1000);
+        params['addedAt>>'] = timestamp;
+      }
+
+      // Resolution filter
+      if (filters.resolution) {
+        const res = filters.resolution as string;
+        if (res === '4k') {
+          params['videoResolution'] = '4k';
+        } else if (res === 'hd') {
+          params['videoResolution'] = '1080';
+        }
+      }
+
+      // Sorting
+      let sortField = 'titleSort';
+      let sortDir = 'asc';
+
+      if (filters.sort) {
+        const sortMap: Record<string, string> = {
+          titleSort: 'titleSort',
+          year: 'year',
+          rating: 'rating',
+          addedAt: 'addedAt',
+          lastViewedAt: 'lastViewedAt',
+          duration: 'duration',
+          random: 'random',
+        };
+        sortField = sortMap[filters.sort as string] || 'titleSort';
+      }
+      if (filters.sortOrder === 'desc') {
+        sortDir = 'desc';
+      }
+      params['sort'] = `${sortField}:${sortDir}`;
+
+      // Limit
+      params['X-Plex-Container-Start'] = 0;
+      params['X-Plex-Container-Size'] = (filters.limit as number) || 25;
+
+      const response = await this.client.get(`/library/sections/${sectionId}/all`, {
+        params,
+      });
+
+      return response.data.MediaContainer.Metadata || [];
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  private getPlexTypeNumber(type: string): number {
+    const typeMap: Record<string, number> = {
+      movie: 1,
+      show: 2,
+      season: 3,
+      episode: 4,
+      trailer: 5,
+      comic: 6,
+      person: 7,
+      artist: 8,
+      album: 9,
+      track: 10,
+      photo: 11,
+      clip: 12,
+      photo_album: 13,
+    };
+    return typeMap[type] || 1;
   }
 
   // Helpers
