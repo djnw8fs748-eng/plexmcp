@@ -16,7 +16,7 @@ A TypeScript-based MCP (Model Context Protocol) server that provides full contro
 | **History** | `get_watch_history`, `get_continue_watching` | View watch progress |
 | **Playlists** | `list_playlists`, `get_playlist_items`, `create_playlist`, `add_to_playlist`, `remove_from_playlist`, `delete_playlist` | Manage playlists |
 | **Posters** | `list_posters`, `get_current_poster`, `set_poster`, `delete_poster`, `upload_poster` | Manage media artwork |
-| **Sharing** | `list_friends`, `get_friend`, `share_library`, `update_share`, `unshare_library`, `invite_friend` | Manage library sharing |
+| **Sharing** | `list_friends`, `get_friend`, `get_shared_servers`, `share_library`, `update_share`, `unshare_library`, `invite_friend` | Manage library sharing |
 | **Tautulli** | `tautulli_activity`, `tautulli_history`, `tautulli_most_watched`, `tautulli_user_stats`, etc. | Advanced statistics |
 | **System** | `get_server_info`, `set_read_only_mode`, `get_mode` | Server status and mode control |
 
@@ -24,7 +24,12 @@ A TypeScript-based MCP (Model Context Protocol) server that provides full contro
 
 When enabled via `set_read_only_mode(true)`:
 - All read operations continue to work (search, browse, history, status)
-- Write/control operations are blocked (playback control, playlist modifications, poster changes)
+- Write/control operations are blocked:
+  - Playback control (`play_media`, `pause`, `resume`, `stop`, `seek`, `set_volume`)
+  - Playlist modifications (`create_playlist`, `add_to_playlist`, `remove_from_playlist`, `delete_playlist`)
+  - Poster changes (`set_poster`, `delete_poster`, `upload_poster`)
+  - Library management (`scan_library`, `refresh_metadata`, `analyze_media`, `empty_trash`, `clean_bundles`, `optimize_database`)
+  - Sharing modifications (`share_library`, `update_share`, `unshare_library`, `invite_friend`)
 - Mode persists until toggled off
 
 ## Installation
@@ -58,11 +63,17 @@ When enabled via `set_read_only_mode(true)`:
 
 ### Getting Your Plex Token
 
+**Method 1: Via Plex Web App XML**
 1. Open Plex Web App and sign in
 2. Browse to any media item
 3. Click the "..." menu and select "Get Info"
 4. Click "View XML"
 5. In the URL, find `X-Plex-Token=YOUR_TOKEN_HERE`
+
+**Method 2: Via Plex Account Settings**
+1. Sign in at [plex.tv](https://plex.tv)
+2. Go to Settings > Account
+3. Find your token under the "Authorized Devices" or by inspecting any API request in browser dev tools (Network tab, look for `X-Plex-Token` header)
 
 ## Configuration
 
@@ -152,6 +163,13 @@ Once configured, you can interact naturally with Claude:
 - "Find action movies added in the last week"
 - "Show me short films under 90 minutes"
 
+### Advanced Search (Precise Filters)
+- "Find R-rated horror movies directed by Wes Craven"
+- "Search for Tom Hanks movies sorted by rating"
+- "Show me HD movies from the 2000s I haven't finished"
+- "Find animated movies from Studio Ghibli"
+- "List TV-MA shows added in the last 30 days, sorted by newest"
+
 ### Library Management
 - "Scan my Movies library for new content"
 - "Refresh metadata for Inception"
@@ -228,6 +246,13 @@ Once configured, you can interact naturally with Claude:
 | `delete_poster` | Delete a poster | No |
 | `upload_poster` | Upload poster from URL | No |
 
+### History Tools
+
+| Tool | Description | Read-Only Safe |
+|------|-------------|----------------|
+| `get_watch_history` | Get watch history (optional: filter by accountId, limit) | Yes |
+| `get_continue_watching` | Get in-progress items ready to continue | Yes |
+
 ### System Tools
 
 | Tool | Description | Read-Only Safe |
@@ -235,8 +260,6 @@ Once configured, you can interact naturally with Claude:
 | `get_server_info` | Get Plex server information | Yes |
 | `set_read_only_mode` | Toggle read-only mode | N/A |
 | `get_mode` | Get current mode | Yes |
-| `get_watch_history` | Get watch history | Yes |
-| `get_continue_watching` | Get in-progress items | Yes |
 
 ### Smart Search Tools
 
@@ -244,6 +267,32 @@ Once configured, you can interact naturally with Claude:
 |------|-------------|----------------|
 | `smart_search` | Natural language search (e.g., "unwatched 90s sci-fi") | Yes |
 | `advanced_search` | Search with precise filters (year, rating, genre, etc.) | Yes |
+
+#### `advanced_search` Filter Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | string (required) | Media type: `movie`, `show`, `episode`, `artist`, `album`, `track` |
+| `sectionId` | string | Specific library section ID to search within |
+| `title` | string | Title contains this text |
+| `year` | number | Exact release year |
+| `minYear` / `maxYear` | number | Year range |
+| `decade` | number | Decade, e.g. `1990` for 90s content |
+| `genre` | string | Genre name (e.g., `action`, `sci-fi`, `comedy`) |
+| `contentRating` | string | Content rating (e.g., `PG-13`, `R`, `TV-MA`) |
+| `minRating` / `maxRating` | number | Audience rating range (0–10) |
+| `director` | string | Director name |
+| `actor` | string | Actor/cast member name |
+| `studio` | string | Studio name |
+| `unwatched` | boolean | Only unwatched items |
+| `watched` | boolean | Only watched items |
+| `inProgress` | boolean | Only in-progress (partially watched) items |
+| `minDuration` / `maxDuration` | number | Duration range in minutes |
+| `addedWithin` | number | Added within N days |
+| `resolution` | string | Video resolution: `sd`, `hd`, or `4k` |
+| `sort` | string | Sort by: `titleSort`, `year`, `rating`, `addedAt`, `lastViewedAt`, `duration`, `random` |
+| `sortOrder` | string | `asc` or `desc` (default: `desc`) |
+| `limit` | number | Maximum results (default: 25) |
 
 ### Library Management Tools
 
@@ -280,6 +329,17 @@ Once configured, you can interact naturally with Claude:
 | `tautulli_most_active_users` | Most active users ranking | Yes |
 | `tautulli_plays_by_date` | Play counts over time | Yes |
 | `tautulli_stream_type_stats` | Direct play vs transcode stats | Yes |
+
+## Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `@modelcontextprotocol/sdk` | MCP server framework for tool registration and stdio transport |
+| `axios` | HTTP client for Plex and Tautulli API requests |
+| `dotenv` | Loads environment variables from `.env` file |
+| `zod` | Runtime schema validation for tool input parameters |
+
+Dev dependencies: `typescript`, `@types/node`
 
 ## Development
 
