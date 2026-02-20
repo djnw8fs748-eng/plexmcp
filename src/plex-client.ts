@@ -397,10 +397,23 @@ export class PlexApiClient {
 
   async deletePoster(ratingKey: string, posterKey: string): Promise<void> {
     try {
-      // The posterKey typically looks like /library/metadata/123/posters/456
-      // We need to delete using the provider parameter
+      // For locally uploaded posters, the listing returns an internal path like
+      // /library/metadata/{id}/file?url=upload%3A%2F%2Fposters%2F{hash}.
+      // The delete endpoint requires the bare upload:// URL as the `url`
+      // parameter, so extract it from the query string when present.
+      let deleteKey = posterKey;
+      if (posterKey.startsWith('/')) {
+        const qsIndex = posterKey.indexOf('?');
+        if (qsIndex !== -1) {
+          const params = new URLSearchParams(posterKey.slice(qsIndex + 1));
+          const innerUrl = params.get('url');
+          if (innerUrl && innerUrl.startsWith('upload://')) {
+            deleteKey = innerUrl;
+          }
+        }
+      }
       await this.client.delete(`/library/metadata/${ratingKey}/posters`, {
-        params: { url: posterKey },
+        params: { url: deleteKey },
       });
     } catch (error) {
       this.handleError(error);
