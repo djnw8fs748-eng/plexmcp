@@ -18,6 +18,7 @@ import { libraryManagementTools } from './tools/library-management.js';
 import { sharingTools } from './tools/sharing.js';
 import { smartSearchTools } from './tools/smart-search.js';
 import { tautulliTools } from './tools/tautulli.js';
+import { watchlistTools } from './tools/watchlist.js';
 import { createErrorResponse } from './utils.js';
 import type { ToolResponse } from './types.js';
 
@@ -33,6 +34,7 @@ const allTools = [
   ...sharingTools,
   ...smartSearchTools,
   ...tautulliTools,
+  ...watchlistTools,
 ];
 
 // Create tool handler map
