@@ -686,6 +686,9 @@ export class PlexApiClient {
       if (filters.unwatched) {
         params['unwatched'] = 1;
       }
+      if (filters.watched) {
+        params['viewCount>>'] = 0;
+      }
       if (filters.inProgress) {
         params['inProgress'] = 1;
       }
