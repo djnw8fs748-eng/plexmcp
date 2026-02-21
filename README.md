@@ -14,7 +14,7 @@ A TypeScript-based MCP (Model Context Protocol) server that provides full contro
 | **Playback** | `play_media`, `pause`, `resume`, `stop`, `seek`, `set_volume`, `get_playback_status` | Control active sessions |
 | **Clients** | `list_clients`, `get_active_sessions` | View connected devices |
 | **History** | `get_watch_history`, `get_continue_watching` | View watch progress |
-| **Watchlist** | `get_watchlist`, `add_to_watchlist`, `remove_from_watchlist` | Manage your Plex want-to-watch list |
+| **Watchlist** | `search_plex_catalog`, `get_watchlist`, `add_to_watchlist`, `remove_from_watchlist` | Manage your Plex want-to-watch list |
 | **Playlists** | `list_playlists`, `get_playlist_items`, `create_playlist`, `add_to_playlist`, `remove_from_playlist`, `delete_playlist` | Manage playlists |
 | **Posters** | `list_posters`, `get_current_poster`, `set_poster`, `delete_poster`, `upload_poster` | Manage media artwork |
 | **Sharing** | `list_friends`, `get_friend`, `get_shared_servers`, `share_library`, `update_share`, `unshare_library`, `invite_friend` | Manage library sharing |
@@ -147,7 +147,9 @@ Once configured, you can interact naturally with Claude:
 
 ### Watchlist
 - "What's on my Plex watchlist?"
-- "Add Inception to my watchlist"
+- "Add Inception to my watchlist" *(library item)*
+- "I want to watch Dune Part Three — add it to my watchlist" *(not in library)*
+- "Search the Plex catalog for Severance"
 - "Remove The Matrix from my watchlist"
 - "Show me everything I want to watch"
 
@@ -262,15 +264,20 @@ Once configured, you can interact naturally with Claude:
 
 ### Watchlist Tools
 
-The Plex Watchlist is your personal want-to-watch list, synced via Plex.tv. It requires your Plex token to have a linked Plex.tv account and the media item must be matched to Plex.tv metadata (i.e. have a Plex GUID).
+The Plex Watchlist is your personal want-to-watch list, synced via Plex.tv. It requires your Plex token to have a linked Plex.tv account. Items must be matched to Plex.tv metadata (i.e. have a Plex GUID) to be added.
 
 | Tool | Description | Read-Only Safe |
 |------|-------------|----------------|
+| `search_plex_catalog` | Search the global Plex catalog, including items not in your library | Yes |
 | `get_watchlist` | Get all items in your Plex watchlist | Yes |
-| `add_to_watchlist` | Add a library item to your watchlist by its `ratingKey` | No |
+| `add_to_watchlist` | Add an item to your watchlist (library item via `ratingKey`, or catalog item via `guid`) | No |
 | `remove_from_watchlist` | Remove an item from your watchlist by its `ratingKey` | No |
 
-**Workflow:** Use `search_library` or `advanced_search` to find an item's `ratingKey`, then pass it to `add_to_watchlist`. To remove an item, call `get_watchlist` first to get the `ratingKey` values, then pass one to `remove_from_watchlist`.
+**Adding a library item:** Use `search_library` or `advanced_search` to find the item's `ratingKey`, then pass it to `add_to_watchlist` as `ratingKey`.
+
+**Adding a non-library item:** Use `search_plex_catalog` to find the item — it returns a `guid` for each result (e.g. `plex://movie/...`). Pass that `guid` to `add_to_watchlist`.
+
+**Removing an item:** Call `get_watchlist` to see `ratingKey` values, then pass one to `remove_from_watchlist`.
 
 ### System Tools
 

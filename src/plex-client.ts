@@ -500,6 +500,28 @@ export class PlexApiClient {
     return response.data;
   }
 
+  async searchCatalog(
+    query: string,
+    type?: 'movie' | 'show',
+    limit: number = 10
+  ): Promise<PlexWatchlistItem[]> {
+    try {
+      const params: Record<string, unknown> = { query, limit };
+      if (type) {
+        params.searchTypes = type;
+      }
+      const data = await this.metadataProviderRequest('get', '/library/search', params) as {
+        MediaContainer?: { SearchResult?: Array<{ Metadata?: PlexWatchlistItem }> };
+      };
+      const results = data?.MediaContainer?.SearchResult || [];
+      return results
+        .map((r) => r.Metadata)
+        .filter((m): m is PlexWatchlistItem => m !== undefined);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   async getWatchlist(limit: number = 50): Promise<PlexWatchlistItem[]> {
     try {
       const data = await this.metadataProviderRequest('get', '/library/sections/watchlist/all', {
