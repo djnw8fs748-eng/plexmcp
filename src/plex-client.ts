@@ -8,6 +8,7 @@ import type {
   PlexPlaylist,
   PlexPoster,
   PlexHistoryItem,
+  PlexWatchlistItem,
   PlexFriend,
   PlexSharedServer,
 } from './types.js';
@@ -474,6 +475,59 @@ export class PlexApiClient {
   async optimizeDatabase(): Promise<void> {
     try {
       await this.client.put('/library/optimize');
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // Watchlist (requires Plex.tv metadata provider API)
+  private async metadataProviderRequest(
+    method: 'get' | 'put' | 'delete',
+    endpoint: string,
+    params?: Record<string, unknown>
+  ): Promise<unknown> {
+    const plexToken = process.env.PLEX_TOKEN;
+    const response = await axios({
+      method,
+      url: `https://metadata.provider.plex.tv${endpoint}`,
+      headers: {
+        'X-Plex-Token': plexToken,
+        'X-Plex-Client-Identifier': 'plex-mcp-server',
+        Accept: 'application/json',
+      },
+      params,
+    });
+    return response.data;
+  }
+
+  async getWatchlist(limit: number = 50): Promise<PlexWatchlistItem[]> {
+    try {
+      const data = await this.metadataProviderRequest('get', '/library/sections/watchlist/all', {
+        'X-Plex-Container-Start': 0,
+        'X-Plex-Container-Size': limit,
+      }) as { MediaContainer?: { Metadata?: PlexWatchlistItem[] } };
+      return data?.MediaContainer?.Metadata || [];
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async addToWatchlist(ratingKey: string): Promise<void> {
+    try {
+      // ratingKey should be the Plex GUID (e.g. from the item's guid field)
+      await this.metadataProviderRequest('put', '/actions/addToWatchlist', {
+        ratingKey,
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async removeFromWatchlist(ratingKey: string): Promise<void> {
+    try {
+      await this.metadataProviderRequest('put', '/actions/removeFromWatchlist', {
+        ratingKey,
+      });
     } catch (error) {
       this.handleError(error);
     }

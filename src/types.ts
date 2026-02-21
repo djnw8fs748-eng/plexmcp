@@ -140,6 +140,17 @@ export interface PlexPoster {
   provider?: string;
 }
 
+export interface PlexWatchlistItem {
+  ratingKey: string;
+  guid: string;
+  type: string;
+  title: string;
+  year?: number;
+  thumb?: string;
+  summary?: string;
+  addedAt?: number;
+}
+
 export interface PlexHistoryItem {
   historyKey: string;
   key: string;
