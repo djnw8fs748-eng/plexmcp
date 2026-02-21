@@ -134,7 +134,11 @@ export async function deletePoster(
 
     // First check if this is the selected poster
     const posters = await client.getPosters(args.ratingKey);
-    const posterToDelete = posters.find((p) => p.key === args.posterKey);
+    // Match by key (full path) or ratingKey (upload:// URI) — both may be
+    // shown in list_posters output and users may pass either.
+    const posterToDelete = posters.find(
+      (p) => p.key === args.posterKey || p.ratingKey === args.posterKey
+    );
 
     if (!posterToDelete) {
       return createErrorResponse(new Error('Poster not found'));
@@ -148,7 +152,9 @@ export async function deletePoster(
       );
     }
 
-    await client.deletePoster(args.ratingKey, args.posterKey);
+    // Always pass the canonical key (full path) so deletePoster can pick the
+    // right endpoint, regardless of which identifier the user supplied.
+    await client.deletePoster(args.ratingKey, posterToDelete.key);
 
     return createResponse({
       message: 'Poster deleted successfully',
