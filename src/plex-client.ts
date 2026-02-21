@@ -398,24 +398,18 @@ export class PlexApiClient {
 
   async deletePoster(ratingKey: string, posterKey: string): Promise<void> {
     try {
-      // For locally uploaded posters, the listing returns an internal path like
-      // /library/metadata/{id}/file?url=upload%3A%2F%2Fposters%2F{hash}.
-      // The delete endpoint requires the bare upload:// URL as the `url`
-      // parameter, so extract it from the query string when present.
-      let deleteKey = posterKey;
       if (posterKey.startsWith('/')) {
-        const qsIndex = posterKey.indexOf('?');
-        if (qsIndex !== -1) {
-          const params = new URLSearchParams(posterKey.slice(qsIndex + 1));
-          const innerUrl = params.get('url');
-          if (innerUrl && innerUrl.startsWith('upload://')) {
-            deleteKey = innerUrl;
-          }
-        }
+        // Locally uploaded poster: the key is the full Plex-internal path,
+        // e.g. /library/metadata/{id}/file?url=upload%3A%2F%2Fposters%2F{hash}.
+        // DELETE that path directly — using the /posters?url= endpoint instead
+        // causes a 404 for upload:// URIs.
+        await this.client.delete(posterKey);
+      } else {
+        // External poster (TMDB, etc.): pass the URL as a query parameter.
+        await this.client.delete(`/library/metadata/${ratingKey}/posters`, {
+          params: { url: posterKey },
+        });
       }
-      await this.client.delete(`/library/metadata/${ratingKey}/posters`, {
-        params: { url: deleteKey },
-      });
     } catch (error) {
       this.handleError(error);
     }
